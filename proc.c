@@ -532,3 +532,9 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+
+int
+getchildren(){
+    return 2020;
+}
