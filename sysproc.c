@@ -90,7 +90,7 @@ sys_uptime(void)
   return xticks;
 }
 
-int
+char*
 sys_getchildren(void){
     return getchildren();
 }

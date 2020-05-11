@@ -8,8 +8,8 @@
 
 
 int
-main(void)
-{
-    printf(1, "the number is: %d\n", getchildren());
+main(void) {
+    printf(1, "the result is: %s\n", getchildren());
+    printf(1, getchildren());
     exit();
 }
