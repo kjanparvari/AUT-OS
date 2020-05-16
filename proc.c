@@ -8,7 +8,6 @@
 #include "spinlock.h"
 
 
-
 struct {
     struct spinlock lock;
     struct proc proc[NPROC];
@@ -23,6 +22,16 @@ extern void forkret(void);
 extern void trapret(void);
 
 static void wakeup1(void *chan);
+
+int my_malloc(int n);
+
+char *my_strcat(char *destination, const char *source);
+
+inline void swap(char *x, char *y);
+
+char *reverse(char *buffer, int i, int j);
+
+char *my_itoa(int value, char *buffer, int base);
 
 void
 pinit(void) {
@@ -523,7 +532,7 @@ procdump(void) {
 
 // returns children of running process
 // actually its just a string of pid's next to each other with 0 between them
-char*
+char *
 getchildren(void) {
 //    struct proc* curproc = myproc(); // here we have the running process
 //    struct proc *p; // for iterating the process table
@@ -549,79 +558,83 @@ getchildren(void) {
 //            my_strcat(result, cid);
 //        }
 //    char* result = "Hello There";'
-    static char result[20 + 1];
-    strncpy(result, "SHIT", 4);
-    result[5] = '\0';
-    return result;
+    char buff[6];
+    char *address = (char *) my_malloc(35);
+    strncpy(address, "HOLY", 4);
+    *(address + 4) = '\0';
+    my_strcat(address, " SHIT ");
+    my_strcat(address, my_itoa(24601, buff, 10));
+    return address;
 }
 
-//
-//char* my_strcat(char* destination, const char* source)
-//{
-//    // make ptr point to the end of destination string
-//    char* ptr = destination + strlen(destination);
-//
-//    // Appends characters of source to the destination string
-//    while (*source != '\0')
-//        *ptr++ = *source++;
-//
-//    // null terminate destination string
-//    *ptr = '\0';
-//
-//    // destination is returned by standard strcat()
-//    return destination;
-//}
-//
-//// inline function to swap two numbers
-//inline void swap(char *x, char *y) {
-//    char t = *x; *x = *y; *y = t;
-//}
-//
-//// function to reverse buffer[i..j]
-//char* reverse(char *buffer, int i, int j)
-//{
-//    while (i < j)
-//        swap(&buffer[i++], &buffer[j--]);
-//
-//    return buffer;
-//}
-//
-//// Iterative function to implement itoa() function in C
-//char* my_itoa(int value, char* buffer, int base)
-//{
-//    // invalid input
-//    if (base < 2 || base > 32)
-//        return buffer;
-//
-//    // consider absolute value of number
-//    int n = abs(value);
-//
-//    int i = 0;
-//    while (n)
-//    {
-//        int r = n % base;
-//
-//        if (r >= 10)
-//            buffer[i++] = 65 + (r - 10);
-//        else
-//            buffer[i++] = 48 + r;
-//
-//        n = n / base;
-//    }
-//
-//    // if number is 0
-//    if (i == 0)
-//        buffer[i++] = '0';
-//
-//    // If base is 10 and value is negative, the resulting string
-//    // is preceded with a minus sign (-)
-//    // With any other base, value is always considered unsigned
-//    if (value < 0 && base == 10)
-//        buffer[i++] = '-';
-//
-//    buffer[i] = '\0'; // null terminate string
-//
-//    // reverse the string and return it
-//    return reverse(buffer, 0, i - 1);
-//}
-//
+int my_malloc(int n) {
+    int addr;
+    addr = myproc()->sz;
+    if (growproc(n) < 0)
+        return -1;
+    return addr;
+}
+
+
+char *my_strcat(char *destination, const char *source) {
+    // make ptr point to the end of destination string
+    char *ptr = destination + strlen(destination);
+
+    // Appends characters of source to the destination string
+    while (*source != '\0')
+        *ptr++ = *source++;
+
+    // null terminate destination string
+    *ptr = '\0';
+
+    // destination is returned by standard strcat()
+    return destination;
+}
+
+// inline function to swap two numbers
+inline void swap(char *x, char *y) {
+    char t = *x;
+    *x = *y;
+    *y = t;
+}
+
+// function to reverse buffer[i..j]
+char *reverse(char *buffer, int i, int j) {
+    while (i < j)
+        swap(&buffer[i++], &buffer[j--]);
+    return buffer;
+}
+
+// Iterative function to implement itoa() function in C
+char *my_itoa(int value, char *buffer, int base) {
+    // invalid input
+    if (base < 2 || base > 32)
+        return buffer;
+
+    int i = 0;
+    while (value) {
+        int r = value % base;
+
+        if (r >= 10)
+            buffer[i++] = 65 + (r - 10);
+        else
+            buffer[i++] = 48 + r;
+
+        value = value / base;
+    }
+
+    // if number is 0
+    if (i == 0)
+        buffer[i++] = '0';
+
+    // If base is 10 and value is negative, the resulting string
+    // is preceded with a minus sign (-)
+    // With any other base, value is always considered unsigned
+    if (value < 0 && base == 10)
+        buffer[i++] = '-';
+
+    buffer[i] = '\0'; // null terminate string
+
+    // reverse the string and return it
+    return reverse(buffer, 0, i - 1);
+}
