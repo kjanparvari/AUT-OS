@@ -9,7 +9,29 @@
 
 int
 main(void) {
-    printf(1, "the result is: %s\n", getchildren());
-    printf(1, getchildren());
+//    int a;
+//    int *flag = &a;  // zero means its free to print - one means someone is printing
+//    *(flag) = 0;
+//    fork();
+//    fork();
+//    fork();
+//
+//    while (*(flag) == 1) {continue;}
+//
+//    *(flag) = 1;
+//    printf(1, getchildren());
+//    printf(1, "\n");
+//    *(flag) = 0;
+//
+//    while (*(flag) == 1) {continue;}
+    if (fork() != 0)
+        if (fork() != 0)
+            if (fork() != 0)
+                if (fork() != 0)
+                    printf(1, getchildren());
+
+    while (wait() != -1)
+        wait();
+
     exit();
 }

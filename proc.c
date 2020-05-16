@@ -534,37 +534,47 @@ procdump(void) {
 // actually its just a string of pid's next to each other with 0 between them
 char *
 getchildren(void) {
-//    struct proc* curproc = myproc(); // here we have the running process
-//    struct proc *p; // for iterating the process table
-//    char* result = ""; // final thing that we return
-//    char cid[5]; // to hold the id of child thorough iterating
-//    char buffer[5];
-//    int isFirstChild = 1 ; // initially its 1 after adding first child pid to string, we make it 0
+    struct proc *curproc = myproc(); // here we have the running process
+    struct proc *p; // for iterating the process table
+    char *result = (char *) my_malloc(20); // final thing that we return
+    char cid[5]; // to hold the id of child thorough iterating
+    int isFirstChild = 1 ; // initially its 1 after adding first child pid to string, we make it 0
+    int idLength = 0; // length of each child id
 //    int newlength = 0; // for changing the size of the string
-//
+
 //    acquire(&ptable.lock);
-//
-//    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-//        if(p->parent->pid == curproc->pid){
-//            cid = my_itoa(curproc->pid, buffer, 10);
-//            newlength = sizeof(char) * ( strlen(result) + strlen(cid) );
-//            if(isFirstChild == 1){
-//                result = (char *) malloc(newlength);
-//                isFirstChild = 0;
-//            }else{
-//                result = (char *) malloc(newlength + sizeof(char));
-//                my_strcat(result, "0");
-//            }
-//            my_strcat(result, cid);
-//        }
-//    char* result = "Hello There";'
-    char buff[6];
-    char *address = (char *) my_malloc(35);
-    strncpy(address, "HOLY", 4);
-    *(address + 4) = '\0';
-    my_strcat(address, " SHIT ");
-    my_strcat(address, my_itoa(24601, buff, 10));
-    return address;
+
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+        if(p->parent->pid == curproc->pid){
+            idLength = strlen(my_itoa(p->pid, cid, 10));
+            strncpy(cid, my_itoa(p->pid, cid, 10), idLength);
+            cid[idLength] = '\0';
+//            newlength = sizeof(char) * ( strlen(result) + idLength );
+            if(isFirstChild == 1){
+//                result = (char *) my_malloc(newlength);
+                isFirstChild = 0;
+            }else{
+//                result = (char *) my_malloc(newlength + sizeof(char));
+                my_strcat(result, "0");
+            }
+            my_strcat(result, cid);
+        }
+//    release(&ptable.lock);
+//    my_itoa(curproc->pid, cid, 10);
+//    strncpy(result, cid, strlen(cid));
+//    result[strlen(cid)] = '\0';
+    if(strncmp(result, "", strlen(result)) == 0)
+        strncpy(result, "NoChild", 7);
+
+    return result;
+//    char buff[6];
+//    char *address = (char *) my_malloc(35);
+//    strncpy(address, "HOLY", 4);
+//    *(address + 4) = '\0';
+//    my_strcat(address, " SHIT ");
+//    my_itoa(24601, buff, 10);
+//    my_strcat(address, buff);
+//    return address;
 }
 
 int my_malloc(int n) {
