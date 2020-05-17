@@ -16,6 +16,7 @@ struct {
 static struct proc *initproc;
 
 int nextpid = 1;
+int schedule_type = SCHED_TYPE_ORIGINAL; // default alg. is original xv6
 
 extern void forkret(void);
 
@@ -32,6 +33,13 @@ inline void swap(char *x, char *y);
 char *reverse(char *buffer, int i, int j);
 
 char *my_itoa(int value, char *buffer, int base);
+
+void original_scheduler(struct proc *p, struct cpu *c);
+
+void modified_scheduler(struct proc *p, struct cpu *c);
+
+void priority_scheduler(struct proc *p, struct cpu *c);
+
 
 void
 pinit(void) {
@@ -336,27 +344,52 @@ scheduler(void) {
 
         // Loop over process table looking for process to run.
         acquire(&ptable.lock);
-        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-            if (p->state != RUNNABLE)
-                continue;
 
-            // Switch to chosen process.  It is the process's job
-            // to release ptable.lock and then reacquire it
-            // before jumping back to us.
-            c->proc = p;
-            switchuvm(p);
-            p->state = RUNNING;
+        if(schedule_type == SCHED_TYPE_ORIGINAL)
+            original_scheduler(p, c);
 
-            swtch(&(c->scheduler), p->context);
-            switchkvm();
+        else if(schedule_type == SCHED_TYPE_MODIFIED)
+            modified_scheduler(p, c);
 
-            // Process is done running for now.
-            // It should have changed its p->state before coming back.
-            c->proc = 0;
-        }
+        else if(schedule_type == SCHED_TYPE_PRIORITY)
+            priority_scheduler(p, c);
+
         release(&ptable.lock);
 
     }
+}
+void
+original_scheduler(struct proc *p, struct cpu *c){
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if (p->state != RUNNABLE)
+            continue;
+
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+        // before jumping back to us.
+        c->proc = p;
+        switchuvm(p);
+        p->firstCpu = 1;
+        p->state = RUNNING;
+
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+    }
+}
+void
+modified_scheduler(struct proc *p, struct cpu *c){
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if (p->state != RUNNABLE)
+            continue;
+    }
+}
+void
+priority_scheduler(struct proc *p, struct cpu *c){
+
 }
 
 // Enter scheduler.  Must hold only ptable.lock
@@ -387,11 +420,15 @@ sched(void) {
 // Give up the CPU for one scheduling round.
 void
 yield(void) {
-    acquire(&ptable.lock);  //DOC: yieldlock
-    myproc()->state = RUNNABLE;
-    sched();
-    release(&ptable.lock);
+    if ( (schedule_type == SCHED_TYPE_MODIFIED && myproc()->runningTime % QUANTUM == 0)
+    || (schedule_type == SCHED_TYPE_ORIGINAL || schedule_type == SCHED_TYPE_PRIORITY) ){
+        acquire(&ptable.lock);  //DOC: yieldlock
+        myproc()->state = RUNNABLE;
+        sched();
+        release(&ptable.lock);
+    }
 }
+
 
 // A fork child's very first scheduling by scheduler()
 // will swtch here.  "Return" to user space.
@@ -538,32 +575,32 @@ getchildren(void) {
     struct proc *p; // for iterating the process table
     char *result = (char *) my_malloc(20); // final thing that we return
     char cid[5]; // to hold the id of child thorough iterating
-    int isFirstChild = 1 ; // initially its 1 after adding first child pid to string, we make it 0
+    int isFirstChild = 1; // initially its 1 after adding first child pid to string, we make it 0
     int idLength = 0; // length of each child id
 //    int newlength = 0; // for changing the size of the string
 
-//    acquire(&ptable.lock);
+    acquire(&ptable.lock);
 
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-        if(p->parent->pid == curproc->pid){
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+        if (p->parent->pid == curproc->pid) {
             idLength = strlen(my_itoa(p->pid, cid, 10));
             strncpy(cid, my_itoa(p->pid, cid, 10), idLength);
             cid[idLength] = '\0';
 //            newlength = sizeof(char) * ( strlen(result) + idLength );
-            if(isFirstChild == 1){
+            if (isFirstChild == 1) {
 //                result = (char *) my_malloc(newlength);
                 isFirstChild = 0;
-            }else{
+            } else {
 //                result = (char *) my_malloc(newlength + sizeof(char));
                 my_strcat(result, "0");
             }
             my_strcat(result, cid);
         }
-//    release(&ptable.lock);
+    release(&ptable.lock);
 //    my_itoa(curproc->pid, cid, 10);
 //    strncpy(result, cid, strlen(cid));
 //    result[strlen(cid)] = '\0';
-    if(strncmp(result, "", strlen(result)) == 0)
+    if (strncmp(result, "", strlen(result)) == 0)
         strncpy(result, "NoChild", 7);
 
     return result;
@@ -647,4 +684,17 @@ char *my_itoa(int value, char *buffer, int base) {
 
     // reverse the string and return it
     return reverse(buffer, 0, i - 1);
+}
+
+/*changes the scheduling algorithm*/
+int
+sys_changePolicy(void) {
+    int n;
+    argint(0, &n);
+    if (n >= 0 && n < 3) {
+        schedule_type = n;
+        return 1;
+    } else {
+        return -1;
+    }
 }

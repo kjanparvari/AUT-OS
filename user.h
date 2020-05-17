@@ -24,6 +24,7 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 char* getchildren(void);
+int changePolicy(void);
 
 // ulib.c
 int stat(const char*, struct stat*);

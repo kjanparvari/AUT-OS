@@ -94,3 +94,15 @@ char*
 sys_getchildren(void){
     return getchildren();
 }
+
+//int
+//sys_changePolicy(void){
+//    return 1;
+//}
+
+// returns id of parent process
+int
+sys_getppid(void)
+{
+    return myproc()-> parent->pid;
+}
