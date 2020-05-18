@@ -1,8 +1,3 @@
-#define SCHED_TYPE_ORIGINAL 0
-#define SCHED_TYPE_MODIFIED 1
-#define SCHED_TYPE_PRIORITY 2
-
-
 // Per-CPU state
 struct cpu {
     uchar apicid;                // Local APIC ID

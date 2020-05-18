@@ -5,8 +5,9 @@
 #include "types.h"
 #include "stat.h"
 #include "user.h"
+#include "myHeaders.h"
 
-struct timeVariables{
+struct timeStruct{
     int creationTime;
     int terminationTime;
     int sleepingTime;
@@ -15,7 +16,7 @@ struct timeVariables{
 };
 
 // Childrens TT and WT Time
-struct processTimeVariables{
+struct processTimeStruct{
     int pid;
     int turnAroundTime;
     int CBT;
@@ -23,15 +24,15 @@ struct processTimeVariables{
 };
 
 // Childrens ATT and AWT Time
-struct averageTimeVariables{
+struct averageTimeStruct{
     int averageTurnAroundTime;
     int averageCBT;
     int averageWaitingTime;
 };
 
 int main(void) {
-    struct processTimeVariables ptv[10] ;
-    struct averageTimeVariables atv;
+    struct processTimeStruct ptv[10] ;
+    struct averageTimeStruct atv;
 
     // Reinitialize the averageTimeVariables values
     atv.averageTurnAroundTime = 0;
@@ -39,7 +40,7 @@ int main(void) {
     atv.averageWaitingTime = 0;
 
     // Change The Scheduling Algorithm To The QUANTUM
-    changePolicy(1);
+    changePolicy(SCHED_TYPE_MODIFIED);
 
     // Create children to print their pid 1000 times
     for(int f=0; f<10;f++){
@@ -54,7 +55,7 @@ int main(void) {
         }
     }
 
-    struct timeVariables *tv = malloc(sizeof(struct timeVariables));
+    struct timeStruct *tv = malloc(sizeof(struct timeStruct));
     for(int f=0;f<10;f++){
         // Set the ptv variables after one of the children's work is finished
         ptv[f].pid = waitForChild(tv);

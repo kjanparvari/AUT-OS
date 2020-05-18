@@ -7,6 +7,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "myHeaders.h"
 
 
 struct {
@@ -419,6 +420,7 @@ updateTime(void){
 void
 scheduler(void) {
     struct proc *p;
+    p = NULL;
     struct cpu *c = mycpu();
     c->proc = 0;
 

@@ -6,7 +6,7 @@
 #include "stat.h"
 #include "user.h"
 
-struct timeVariables{
+struct timeStruct{
     int creationTime;
     int terminationTime;
     int sleepingTime;
@@ -15,7 +15,7 @@ struct timeVariables{
 };
 
 // Childrens TT and WT Time
-struct processTimeVariables{
+struct processTimeStruct{
     int pid;
     int turnAroundTime;
     int CBT;
@@ -23,15 +23,15 @@ struct processTimeVariables{
 };
 
 // Childrens ATT and AWT Time
-struct averageTimeVariables{
+struct averageTimeStruct{
     int averageTurnAroundTime;
     int averageCBT;
     int averageWaitingTime;
 };
 
 int main(void) {
-    struct processTimeVariables ptv[5][5] ;
-    struct averageTimeVariables atv[5];
+    struct processTimeStruct ptv[5][5] ;
+    struct averageTimeStruct atv[5];
     int numOfProc [5];
 
     // Reinitialize the averageTimeVariables valuse
@@ -58,7 +58,7 @@ int main(void) {
         }
     }
 
-    struct timeVariables *tv = malloc(sizeof(struct timeVariables));
+    struct timeStruct *tv = malloc(sizeof(struct timeStruct));
     for(int f=0;f<25;f++){
         // Get the pid of the finished child
         int pid = waitForChild(tv);

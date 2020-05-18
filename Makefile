@@ -184,7 +184,7 @@ UPROGS=\
 	_getChildrenTest\
 	_changePriorityTest\
     _changePolicyTest\
-    _waitForChild\
+    _waitForChildTest\
     _OriginalSchedTest\
     _PrioritySchedTest\
 

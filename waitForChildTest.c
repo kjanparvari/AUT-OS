@@ -6,7 +6,7 @@
 #include "stat.h"
 #include "user.h"
 
-struct timeVariables{
+struct timeStruct{
     int creationTime;
     int terminationTime;
     int sleepingTime;
@@ -25,7 +25,7 @@ int main(void) {
             //sleep(0.1);
             exit();
         } else if(pid > 0){
-            struct timeVariables *tv = malloc(sizeof(struct timeVariables));
+            struct timeStruct *tv = malloc(sizeof(struct timeStruct));
             //sleep(7);
             waitForChild(tv);
             allCbt += tv->runningTime;
