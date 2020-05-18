@@ -62,7 +62,7 @@ struct proc {
     int time_slot;
     int counter[30];             // Number of times a process's system calls have been invoked
     int queue_type;              // shows process queue type
-    int queue_number;            // the number in queue
+//    int queue_number;            // the number in queue
 };
 
 // Process memory is laid out contiguously, low addresses first:

@@ -187,6 +187,7 @@ UPROGS=\
     _waitForChildTest\
     _OriginalSchedTest\
     _PrioritySchedTest\
+    _mlqTest\
 
 
 
@@ -264,6 +265,7 @@ EXTRA=\
     waitForChildTest.c\
     OriginalSchedTest.c\
     PrioritySchedTest.c\
+    mlqTest.c\
 	printf.c umalloc.c\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
 	.gdbinit.tmpl gdbutil\

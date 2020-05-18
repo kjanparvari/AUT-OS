@@ -20,7 +20,6 @@ static struct proc *initproc;
 int nextpid = 1;
 int schedule_type = SCHED_TYPE_ORIGINAL; // default alg. is original xv6
 int executing_queue = QUEUE_ONE;
-int isMLQ = 0;
 
 extern void forkret(void);
 
@@ -50,9 +49,11 @@ int my_malloc(int);
 
 int highestPriorityValue(void);
 
-struct proc *mlqChooseProcess();
+int mlqHighestPriorityValue(void);
 
 void mlqChooseQueue(void);
+
+struct proc *mlqHighestPriorityProcess(void);
 
 
 void
@@ -105,7 +106,13 @@ myproc(void) {
 // Otherwise return 0.
 static struct proc *
 allocproc(void) {
-    int minimum_priority = highestPriorityValue();
+
+    int minimum_priority;
+    if (schedule_type == SCHED_TYPE_MLQ) {
+        minimum_priority = mlqHighestPriorityValue();
+    } else {
+        minimum_priority = highestPriorityValue();
+    }
     struct proc *p;
     char *sp;
 
@@ -133,6 +140,7 @@ allocproc(void) {
     p->sleepingTime = 0;
     p->readyTime = 0;
     p->terminationTime = 0;
+    p->queue_type = QUEUE_ONE;
 
     release(&ptable.lock);
 
@@ -198,7 +206,7 @@ userinit(void) {
     release(&ptable.lock);
 }
 
-struct proc *highestPriorityProcess() {
+struct proc *highestPriorityProcess(void) {
     int min = PRIORITY_MAX;
     struct proc *minimum_process = myproc();
     struct proc *p;
@@ -213,13 +221,40 @@ struct proc *highestPriorityProcess() {
     return minimum_process;
 }
 
-/*returns the value of the highest priority by iterating pttable*/
+struct proc *mlqHighestPriorityProcess(void) {
+    int min = PRIORITY_MAX;
+    struct proc *minimum_process = myproc();
+    struct proc *p;
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if (p->state != RUNNABLE)
+            continue;
+        if (p->state == RUNNABLE && p->changablePriority < min && p->queue_type == QUEUE_ONE) {
+            min = p->changablePriority;
+            minimum_process = p;
+        }
+    }
+    return minimum_process;
+}
+
+/*returns the value of the highest priority by iterating ptable*/
 int
 highestPriorityValue(void) {
     struct proc *p;
     int minimum = PRIORITY_MAX;
     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
         if (p->state == RUNNABLE && p->changablePriority < minimum) {
+            minimum = p->changablePriority;
+        }
+    }
+    return minimum;
+}
+
+int
+mlqHighestPriorityValue(void) {
+    struct proc *p;
+    int minimum = PRIORITY_MAX;
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if (p->state == RUNNABLE && p->changablePriority < minimum && p->queue_type == QUEUE_ONE) {
             minimum = p->changablePriority;
         }
     }
@@ -436,17 +471,22 @@ scheduler(void) {
         // Loop over process table looking for process to run.
         acquire(&ptable.lock);
 
-        if (isMLQ == 1)
-            mlq_scheduler(p, c);
-
-        else if (schedule_type == SCHED_TYPE_ORIGINAL)
-            original_scheduler(p, c);
-
-        else if (schedule_type == SCHED_TYPE_MODIFIED)
-            modified_scheduler(p, c);
-
-        else if (schedule_type == SCHED_TYPE_PRIORITY)
-            priority_scheduler(p, c);
+        switch (schedule_type) {
+            case SCHED_TYPE_ORIGINAL:
+                original_scheduler(p, c);
+                break;
+            case SCHED_TYPE_MODIFIED:
+                modified_scheduler(p, c);
+                break;
+            case SCHED_TYPE_PRIORITY:
+                priority_scheduler(p, c);
+                break;
+            case SCHED_TYPE_MLQ:
+                mlq_scheduler(p, c);
+                break;
+            default:
+                break;
+        }
 
         release(&ptable.lock);
 
@@ -515,8 +555,58 @@ priority_scheduler(struct proc *p, struct cpu *c) {
 void
 mlq_scheduler(struct proc *p, struct cpu *c) {
     mlqChooseQueue();
-    p = mlqChooseProcess();
+    switch (executing_queue) {
+        case QUEUE_ONE:
+            p = mlqHighestPriorityProcess();
+            if (p != myproc()) {
+                p->queue_type = QUEUE_TRANSPORTING;
+                p->changablePriority += p->priority;
+                p->firstCpu = 1;
+                c->proc = p;
+                switchuvm(p);//swtching back to user mode
+                p->state = RUNNING;
+                swtch(&(c->scheduler), p->context);
+                switchkvm();//swtching to kernel mode
+                c->proc = 0;
+                p->queue_type = QUEUE_TWO;
+            }
+            break;
+        case QUEUE_TWO:
+            for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+                if (p->state != RUNNABLE)
+                    continue;
+                p->queue_type = QUEUE_TRANSPORTING;
+                c->proc = p;
+                switchuvm(p);
+                p->firstCpu = 1;
+                p->state = RUNNING;
+                swtch(&(c->scheduler), p->context);
+                switchkvm();
+                c->proc = 0;
+                p->queue_type = QUEUE_THREE;
+            }
+            break;
+        case QUEUE_THREE:
+            for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+                if (p->state != RUNNABLE)
+                    continue;
+                p->queue_type = QUEUE_TRANSPORTING;
+                c->proc = p;
+                switchuvm(p);//swtching back to user mode
+                p->firstCpu = 1;
+                p->state = RUNNING;
+                swtch(&(c->scheduler), p->context);
+                switchkvm();//swtching to kernel mode
+                c->proc = 0;
+            }
+            break;
+        default:
+            break;
+    }
+
+
 }
+
 
 // each time decides which queue is being executed
 void
@@ -536,36 +626,6 @@ mlqChooseQueue(void) {
         }
         if (flag == 1) break;
     }
-
-    switch (executing_queue) {
-        case QUEUE_ONE:
-            schedule_type = SCHED_TYPE_PRIORITY;
-            break;
-        case QUEUE_TWO:
-            schedule_type = SCHED_TYPE_ORIGINAL;
-            break;
-        case QUEUE_THREE:
-            schedule_type = SCHED_TYPE_MODIFIED;
-            break;
-        default:
-            break;
-    }
-
-}
-
-// returns first element of the executing queue
-struct proc *
-mlqChooseProcess() {
-    struct proc *chosen_process = NULL;
-    struct proc *p;
-    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-        if (p->state != RUNNABLE)
-            continue;
-        if (p->state == RUNNABLE && p->queue_type == executing_queue && p->queue_number == QUEUE_FRONT) {
-            chosen_process = p;
-        }
-    }
-    return chosen_process;
 }
 
 // Enter scheduler.  Must hold only ptable.lock
@@ -796,16 +856,10 @@ int
 sys_changePolicy(void) {
     int n;
     argint(0, &n);
-    if (n >= 0 && n < 3) {
+    if (n >= 0 && n < 4) {
         schedule_type = n;
         return 1;
-    } else if (n == 4){
-        if(isMLQ ==1)
-            isMLQ=0;
-        else if(isMLQ == 0)
-            isMLQ =1;
-        return 1;
-    }else {
+    } else {
         return -1;
     }
 }

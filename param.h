@@ -12,7 +12,7 @@
 #define NBUF         (MAXOPBLOCKS*3)  // size of disk block cache
 #define FSSIZE       1000  // size of file system in blocks
 #define QUANTUM	     500
-#define PRIORITY_INIT   10
+#define PRIORITY_INIT   10  // priority that initially is given to the process
 #define PRIORITY_MAX    100000
 #define PRIORITY_MIN    0
-#define SYSCALLS_NUMBER  30
+#define SYSCALLS_NUMBER  28

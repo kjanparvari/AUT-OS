@@ -5,6 +5,8 @@
 #include "types.h"
 #include "stat.h"
 #include "user.h"
+#include "myHeaders.h"
+#include "param.h"
 
 struct timeStruct{
     int creationTime;
@@ -49,7 +51,7 @@ int main(void) {
         int pid = fork();
 
         if (pid == 0){
-            changePriority(1 + getpid() % 5);
+            changePriority(1 + getpid() % PRIORITY_INIT);
             for (int i = 0; i < 500; ++i){
                 printf(1, "%d : %d \n", getpid(), i);
             }

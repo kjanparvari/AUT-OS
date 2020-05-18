@@ -13,6 +13,7 @@
 #define SCHED_TYPE_ORIGINAL 0
 #define SCHED_TYPE_MODIFIED 1
 #define SCHED_TYPE_PRIORITY 2
+#define SCHED_TYPE_MLQ      3
 
 
 // Queue:
@@ -20,4 +21,4 @@
 #define QUEUE_ONE           0
 #define QUEUE_TWO           1
 #define QUEUE_THREE         2
-#define QUEUE_FRONT         0
+#define QUEUE_TRANSPORTING  3
