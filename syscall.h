@@ -23,3 +23,6 @@
 #define SYS_getchildren  22
 #define SYS_changePolicy 23
 #define SYS_getppid  24
+#define SYS_changePriority 25
+#define SYS_waitForChild 26
+#define SYS_updateTime 27

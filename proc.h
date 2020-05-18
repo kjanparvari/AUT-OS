@@ -62,7 +62,10 @@ struct proc {
     int readyTime;               // When the process is ready
     int runningTime;             // Amount of time the process is running(CBT)
     int firstCpu;                // Check the first time that the process get the cpu
-
+    int priority;                // fixed priority that'll be added to changablePriority
+    int changablePriority;        // the priority that changes every time
+    int time_slot;
+    int counter[30];	       // Number of times a process's system calls have been invoked
 };
 
 // Process memory is laid out contiguously, low addresses first:
@@ -70,3 +73,12 @@ struct proc {
 //   original data and bss
 //   fixed-size stack
 //   expandable heap
+
+struct timeStruct{
+    int creationTime;
+    int terminationTime;
+    int sleepingTime;
+    int readyTime;
+    int runningTime;
+};
+

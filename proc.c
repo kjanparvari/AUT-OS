@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include "types.h"
 #include "defs.h"
 #include "param.h"
@@ -40,6 +41,11 @@ void modified_scheduler(struct proc *p, struct cpu *c);
 
 void priority_scheduler(struct proc *p, struct cpu *c);
 
+struct proc *highestPriorityProcess();
+
+int highestPriorityValue(void);
+
+int updateTime(void)
 
 void
 pinit(void) {
@@ -91,10 +97,14 @@ myproc(void) {
 // Otherwise return 0.
 static struct proc *
 allocproc(void) {
+    int minimum_priority = highestPriorityValue();
     struct proc *p;
     char *sp;
 
     acquire(&ptable.lock);
+
+    if(minimum_priority == PRIORITY_MAX)
+        minimum_priority = PRIORITY_MIN;
 
     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
         if (p->state == UNUSED)
@@ -106,6 +116,15 @@ allocproc(void) {
     found:
     p->state = EMBRYO;
     p->pid = nextpid++;
+    p->time_slot = 0;
+    p->priority = PRIORITY_INIT; // default is 10 for new process
+    p->changablePriority = minimum_priority;
+    p->creationTime = ticks;  // current value of ticks
+    p->runningTime = 0;
+    p->firstCpu = 0; // this process has not aquired cpu yet
+    p->sleepingTime = 0;
+    p->readyTime = 0;
+    p->terminationTime = 0;
 
     release(&ptable.lock);
 
@@ -132,6 +151,8 @@ allocproc(void) {
 
     return p;
 }
+
+
 
 //PAGEBREAK: 32
 // Set up first user process.
@@ -169,6 +190,36 @@ userinit(void) {
 
     release(&ptable.lock);
 }
+
+struct proc *highestPriorityProcess() {
+    int min = PRIORITY_MAX;
+    struct proc *minimum_process = myproc();
+    struct proc *p;
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if (p->state != RUNNABLE)
+            continue;
+        if (p->state == RUNNABLE && p->changablePriority < min) {
+            min = p->changablePriority;
+            minimum_process = p;
+        }
+    }
+
+    return minimum_process;
+}
+
+/*returns the value of the highest priority by iterating pttable*/
+int
+highestPriorityValue(void) {
+    struct proc *p;
+    int minimum = PRIORITY_MAX;
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if (p->state == RUNNABLE && p->changablePriority < minimum) {
+            minimum = p->changablePriority;
+        }
+    }
+    return minimum;
+}
+
 
 // Grow current process's memory by n bytes.
 // Return 0 on success, -1 on failure.
@@ -236,6 +287,14 @@ fork(void) {
     return pid;
 }
 
+
+/*resetting the counter*/
+void reinitCounter(void) {
+    for (int i = 0; i < SYSCALLS_NUMBER ; i++) {
+        myproc()->counter[i] = 0;
+    }
+}
+
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
@@ -244,6 +303,9 @@ exit(void) {
     struct proc *curproc = myproc();
     struct proc *p;
     int fd;
+
+    reinitCounter();//when the process leaves, it must reset it's counter
+
 
     if (curproc == initproc)
         panic("init exiting");
@@ -277,6 +339,9 @@ exit(void) {
 
     // Jump into the scheduler, never to return.
     curproc->state = ZOMBIE;
+
+    curproc->terminationTime = ticks;  // marks termination time wth current value of ticks
+
     sched();
     panic("zombie exit");
 }
@@ -324,6 +389,25 @@ wait(void) {
     }
 }
 
+void
+updateTime(void){
+    struct proc *p;
+    acquire(&ptable.lock);
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if (p->state == RUNNING) {
+            p->runningTime += 1;
+        } else if (p->state == SLEEPING) {
+            p->sleepingTime += 1;
+        } else if (p->state == RUNNABLE && p->firstCpu) {
+            p->readyTime += 1;
+        } else if (p->state == EMBRYO) {
+            p->creationTime += 1;
+
+        }
+    }
+    release(&ptable.lock);
+}
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -345,21 +429,22 @@ scheduler(void) {
         // Loop over process table looking for process to run.
         acquire(&ptable.lock);
 
-        if(schedule_type == SCHED_TYPE_ORIGINAL)
+        if (schedule_type == SCHED_TYPE_ORIGINAL)
             original_scheduler(p, c);
 
-        else if(schedule_type == SCHED_TYPE_MODIFIED)
+        else if (schedule_type == SCHED_TYPE_MODIFIED)
             modified_scheduler(p, c);
 
-        else if(schedule_type == SCHED_TYPE_PRIORITY)
+        else if (schedule_type == SCHED_TYPE_PRIORITY)
             priority_scheduler(p, c);
 
         release(&ptable.lock);
 
     }
 }
+
 void
-original_scheduler(struct proc *p, struct cpu *c){
+original_scheduler(struct proc *p, struct cpu *c) {
     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
         if (p->state != RUNNABLE)
             continue;
@@ -380,16 +465,41 @@ original_scheduler(struct proc *p, struct cpu *c){
         c->proc = 0;
     }
 }
+
 void
-modified_scheduler(struct proc *p, struct cpu *c){
+modified_scheduler(struct proc *p, struct cpu *c) {
     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
         if (p->state != RUNNABLE)
             continue;
+        c->proc = p;
+        switchuvm(p);//swtching back to user mode
+        p->firstCpu = 1;
+        p->state = RUNNING;
+        swtch(&(c->scheduler), p->context);
+        switchkvm();//swtching to kernel mode
+        c->proc = 0;
     }
 }
-void
-priority_scheduler(struct proc *p, struct cpu *c){
 
+void
+priority_scheduler(struct proc *p, struct cpu *c) {
+    p = highestPriorityProcess();
+    if (p != myproc()) {
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+        // before jumping back to us.
+        p->changablePriority += p->priority;
+        p->firstCpu = 1;
+        c->proc = p;
+        switchuvm(p);//swtching back to user mode
+        p->state = RUNNING;
+        swtch(&(c->scheduler), p->context);
+        switchkvm();//swtching to kernel mode
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+    }
 }
 
 // Enter scheduler.  Must hold only ptable.lock
@@ -420,8 +530,8 @@ sched(void) {
 // Give up the CPU for one scheduling round.
 void
 yield(void) {
-    if ( (schedule_type == SCHED_TYPE_MODIFIED && myproc()->runningTime % QUANTUM == 0)
-    || (schedule_type == SCHED_TYPE_ORIGINAL || schedule_type == SCHED_TYPE_PRIORITY) ){
+    if ((schedule_type == SCHED_TYPE_MODIFIED && myproc()->runningTime % QUANTUM == 0)
+        || (schedule_type == SCHED_TYPE_ORIGINAL || schedule_type == SCHED_TYPE_PRIORITY)) {
         acquire(&ptable.lock);  //DOC: yieldlock
         myproc()->state = RUNNABLE;
         sched();
@@ -696,5 +806,60 @@ sys_changePolicy(void) {
         return 1;
     } else {
         return -1;
+    }
+}
+
+
+int
+sys_waitForChild(void) {
+    struct timeStruct *time;
+    argptr(0, (void *) &time, sizeof(*time));
+    struct proc *p;
+    int havekids, pid;
+    struct proc *curproc = myproc();
+
+    acquire(&ptable.lock);
+    for (;;) {
+        // Scan through table looking for exited children.
+        havekids = 0;
+        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+            if (p->parent != curproc)
+                continue;
+            havekids = 1;
+
+            if (p->state == ZOMBIE) {
+                // Found one.
+                pid = p->pid;
+                kfree(p->kstack);
+                p->kstack = 0;
+                freevm(p->pgdir);
+                p->pid = 0;
+                p->parent = 0;
+                p->name[0] = 0;
+                p->killed = 0;
+                p->state = UNUSED;
+                time->creationTime = p->creationTime;
+                time->terminationTime = p->terminationTime;
+                time->sleepingTime = p->sleepingTime;
+                time->readyTime = p->readyTime;
+                time->runningTime = p->runningTime;
+                release(&ptable.lock);
+                return pid;
+            }
+        }
+
+        // No point waiting if we don't have any children.
+        if (!havekids || curproc->killed) {
+            time->creationTime = 0;
+            time->terminationTime = 0;
+            time->sleepingTime = 0;
+            time->readyTime = 0;
+            time->runningTime = 0;
+            release(&ptable.lock);
+            return -1;
+        }
+
+        // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+        sleep(curproc, &ptable.lock);  //DOC: wait-sleep
     }
 }

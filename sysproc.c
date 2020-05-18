@@ -106,3 +106,21 @@ sys_getppid(void)
 {
     return myproc()-> parent->pid;
 }
+
+int
+sys_changePriority(void)
+{
+    int new_priority;
+    argint(0, &new_priority);
+    if(new_priority <= PRIORITY_MIN || new_priority > PRIORITY_INIT)
+        return -1;
+    myproc()->priority = new_priority;
+    return 1;
+}
+
+int
+sys_updateTime(void)
+{
+    updateTime();
+    return 1;
+}
