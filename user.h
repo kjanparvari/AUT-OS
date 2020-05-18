@@ -24,7 +24,10 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 char* getchildren(void);
-int changePolicy(void);
+int changePolicy(int schedule_type);
+int changePriority(int newPriority);
+int waitForChild(struct timeStruct *time);
+int updateTime(void);
 
 // ulib.c
 int stat(const char*, struct stat*);

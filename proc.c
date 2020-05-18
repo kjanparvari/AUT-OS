@@ -45,7 +45,7 @@ struct proc *highestPriorityProcess();
 
 int highestPriorityValue(void);
 
-int updateTime(void)
+
 
 void
 pinit(void) {
