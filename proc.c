@@ -19,6 +19,8 @@ static struct proc *initproc;
 
 int nextpid = 1;
 int schedule_type = SCHED_TYPE_ORIGINAL; // default alg. is original xv6
+int executing_queue = QUEUE_ONE;
+int isMLQ = 0;
 
 extern void forkret(void);
 
@@ -26,26 +28,31 @@ extern void trapret(void);
 
 static void wakeup1(void *chan);
 
-int my_malloc(int n);
+void original_scheduler(struct proc *, struct cpu *);
 
-char *my_strcat(char *destination, const char *source);
+void modified_scheduler(struct proc *, struct cpu *);
 
-inline void swap(char *x, char *y);
+void priority_scheduler(struct proc *, struct cpu *);
 
-char *reverse(char *buffer, int i, int j);
+void mlq_scheduler(struct proc *, struct cpu *);
 
-char *my_itoa(int value, char *buffer, int base);
+struct proc *highestPriorityProcess(void);
 
-void original_scheduler(struct proc *p, struct cpu *c);
+char *my_itoa(int, char *, int);
 
-void modified_scheduler(struct proc *p, struct cpu *c);
+char *reverse(char *, int, int);
 
-void priority_scheduler(struct proc *p, struct cpu *c);
+char *my_strcat(char *, const char *);
 
-struct proc *highestPriorityProcess();
+inline void swap(char *, char *);
+
+int my_malloc(int);
 
 int highestPriorityValue(void);
 
+struct proc *mlqChooseProcess();
+
+void mlqChooseQueue(void);
 
 
 void
@@ -104,7 +111,7 @@ allocproc(void) {
 
     acquire(&ptable.lock);
 
-    if(minimum_priority == PRIORITY_MAX)
+    if (minimum_priority == PRIORITY_MAX)
         minimum_priority = PRIORITY_MIN;
 
     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
@@ -152,7 +159,6 @@ allocproc(void) {
 
     return p;
 }
-
 
 
 //PAGEBREAK: 32
@@ -204,7 +210,6 @@ struct proc *highestPriorityProcess() {
             minimum_process = p;
         }
     }
-
     return minimum_process;
 }
 
@@ -291,7 +296,7 @@ fork(void) {
 
 /*resetting the counter*/
 void reinitCounter(void) {
-    for (int i = 0; i < SYSCALLS_NUMBER ; i++) {
+    for (int i = 0; i < SYSCALLS_NUMBER; i++) {
         myproc()->counter[i] = 0;
     }
 }
@@ -391,7 +396,7 @@ wait(void) {
 }
 
 void
-updateTime(void){
+updateTime(void) {
     struct proc *p;
     acquire(&ptable.lock);
     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
@@ -431,7 +436,10 @@ scheduler(void) {
         // Loop over process table looking for process to run.
         acquire(&ptable.lock);
 
-        if (schedule_type == SCHED_TYPE_ORIGINAL)
+        if (isMLQ == 1)
+            mlq_scheduler(p, c);
+
+        else if (schedule_type == SCHED_TYPE_ORIGINAL)
             original_scheduler(p, c);
 
         else if (schedule_type == SCHED_TYPE_MODIFIED)
@@ -502,6 +510,62 @@ priority_scheduler(struct proc *p, struct cpu *c) {
         // It should have changed its p->state before coming back.
         c->proc = 0;
     }
+}
+
+void
+mlq_scheduler(struct proc *p, struct cpu *c) {
+    mlqChooseQueue();
+    p = mlqChooseProcess();
+}
+
+// each time decides which queue is being executed
+void
+mlqChooseQueue(void) {
+    int q;
+    struct proc *p;
+    int flag = 0; // to break the loop
+    for (q = 0; q < 3; q++) {
+        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+            if (p->state != RUNNABLE)
+                continue;
+            if (p->state == RUNNABLE && p->queue_type == q) {
+                executing_queue = q;
+                flag = 1;
+                break;
+            }
+        }
+        if (flag == 1) break;
+    }
+
+    switch (executing_queue) {
+        case QUEUE_ONE:
+            schedule_type = SCHED_TYPE_PRIORITY;
+            break;
+        case QUEUE_TWO:
+            schedule_type = SCHED_TYPE_ORIGINAL;
+            break;
+        case QUEUE_THREE:
+            schedule_type = SCHED_TYPE_MODIFIED;
+            break;
+        default:
+            break;
+    }
+
+}
+
+// returns first element of the executing queue
+struct proc *
+mlqChooseProcess() {
+    struct proc *chosen_process = NULL;
+    struct proc *p;
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if (p->state != RUNNABLE)
+            continue;
+        if (p->state == RUNNABLE && p->queue_type == executing_queue && p->queue_number == QUEUE_FRONT) {
+            chosen_process = p;
+        }
+    }
+    return chosen_process;
 }
 
 // Enter scheduler.  Must hold only ptable.lock
@@ -726,77 +790,6 @@ getchildren(void) {
 //    return address;
 }
 
-int my_malloc(int n) {
-    int addr;
-    addr = myproc()->sz;
-    if (growproc(n) < 0)
-        return -1;
-    return addr;
-}
-
-
-char *my_strcat(char *destination, const char *source) {
-    // make ptr point to the end of destination string
-    char *ptr = destination + strlen(destination);
-
-    // Appends characters of source to the destination string
-    while (*source != '\0')
-        *ptr++ = *source++;
-
-    // null terminate destination string
-    *ptr = '\0';
-
-    // destination is returned by standard strcat()
-    return destination;
-}
-
-// inline function to swap two numbers
-inline void swap(char *x, char *y) {
-    char t = *x;
-    *x = *y;
-    *y = t;
-}
-
-// function to reverse buffer[i..j]
-char *reverse(char *buffer, int i, int j) {
-    while (i < j)
-        swap(&buffer[i++], &buffer[j--]);
-    return buffer;
-}
-
-// Iterative function to implement itoa() function in C
-char *my_itoa(int value, char *buffer, int base) {
-    // invalid input
-    if (base < 2 || base > 32)
-        return buffer;
-
-    int i = 0;
-    while (value) {
-        int r = value % base;
-
-        if (r >= 10)
-            buffer[i++] = 65 + (r - 10);
-        else
-            buffer[i++] = 48 + r;
-
-        value = value / base;
-    }
-
-    // if number is 0
-    if (i == 0)
-        buffer[i++] = '0';
-
-    // If base is 10 and value is negative, the resulting string
-    // is preceded with a minus sign (-)
-    // With any other base, value is always considered unsigned
-    if (value < 0 && base == 10)
-        buffer[i++] = '-';
-
-    buffer[i] = '\0'; // null terminate string
-
-    // reverse the string and return it
-    return reverse(buffer, 0, i - 1);
-}
 
 /*changes the scheduling algorithm*/
 int
@@ -806,7 +799,13 @@ sys_changePolicy(void) {
     if (n >= 0 && n < 3) {
         schedule_type = n;
         return 1;
-    } else {
+    } else if (n == 4){
+        if(isMLQ ==1)
+            isMLQ=0;
+        else if(isMLQ == 0)
+            isMLQ =1;
+        return 1;
+    }else {
         return -1;
     }
 }
@@ -864,4 +863,80 @@ sys_waitForChild(void) {
         // Wait for children to exit.  (See wakeup1 call in proc_exit.)
         sleep(curproc, &ptable.lock);  //DOC: wait-sleep
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
+
+int my_malloc(int n) {
+    int addr;
+    addr = myproc()->sz;
+    if (growproc(n) < 0)
+        return -1;
+    return addr;
+}
+
+// inline function to swap two numbers
+inline void swap(char *x, char *y) {
+    char t = *x;
+    *x = *y;
+    *y = t;
+}
+
+
+char *my_strcat(char *destination, const char *source) {
+    // make ptr point to the end of destination string
+    char *ptr = destination + strlen(destination);
+
+    // Appends characters of source to the destination string
+    while (*source != '\0')
+        *ptr++ = *source++;
+
+    // null terminate destination string
+    *ptr = '\0';
+
+    // destination is returned by standard strcat()
+    return destination;
+}
+
+
+// function to reverse buffer[i..j]
+char *reverse(char *buffer, int i, int j) {
+    while (i < j)
+        swap(&buffer[i++], &buffer[j--]);
+    return buffer;
+}
+
+// Iterative function to implement itoa() function in C
+char *my_itoa(int value, char *buffer, int base) {
+    // invalid input
+    if (base < 2 || base > 32)
+        return buffer;
+
+    int i = 0;
+    while (value) {
+        int r = value % base;
+
+        if (r >= 10)
+            buffer[i++] = 65 + (r - 10);
+        else
+            buffer[i++] = 48 + r;
+
+        value = value / base;
+    }
+
+    // if number is 0
+    if (i == 0)
+        buffer[i++] = '0';
+
+    // If base is 10 and value is negative, the resulting string
+    // is preceded with a minus sign (-)
+    // With any other base, value is always considered unsigned
+    if (value < 0 && base == 10)
+        buffer[i++] = '-';
+
+    buffer[i] = '\0'; // null terminate string
+
+    // reverse the string and return it
+    return reverse(buffer, 0, i - 1);
 }

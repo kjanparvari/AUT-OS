@@ -7,7 +7,7 @@
 #include "user.h"
 #include "myHeaders.h"
 
-struct timeStruct{
+struct timeStruct {
     int creationTime;
     int terminationTime;
     int sleepingTime;
@@ -15,58 +15,55 @@ struct timeStruct{
     int runningTime;
 };
 
-// Childrens TT and WT Time
-struct processTimeStruct{
+// Struct to hold Childrens TT and WT Time
+struct processTimeStruct {
     int pid;
     int turnAroundTime;
     int CBT;
     int waitingTime;
 };
 
-// Childrens ATT and AWT Time
-struct averageTimeStruct{
+// Struct to hold Childrens Avg TT and Avg WT Time
+struct averageTimeStruct {
     int averageTurnAroundTime;
     int averageCBT;
     int averageWaitingTime;
 };
 
 int main(void) {
-    struct processTimeStruct ptv[10] ;
-    struct averageTimeStruct atv;
+    struct processTimeStruct pts[10];
+    struct averageTimeStruct ats;
 
-    // Reinitialize the averageTimeVariables values
-    atv.averageTurnAroundTime = 0;
-    atv.averageCBT = 0;
-    atv.averageWaitingTime = 0;
+    // initializing avg timeStruct attrs to 0
+    ats.averageTurnAroundTime = 0;
+    ats.averageCBT = 0;
+    ats.averageWaitingTime = 0;
 
-    // Change The Scheduling Algorithm To The QUANTUM
+    // Change The Scheduling Algorithm To The QUANTUM (the mocified one)
     changePolicy(SCHED_TYPE_MODIFIED);
 
     // Create children to print their pid 1000 times
-    for(int f=0; f<10;f++){
+    for (int f = 0; f < 10; f++) {
         int pid = fork();
-        if (pid == 0){//if 0, that means that we are in the child process
-            for (int i = 0; i < 1000; ++i){
+        if (pid == 0) {      //if 0, that means that we are in the child process
+            for (int i = 0; i < 1000; ++i)
                 printf(1, "%d : %d \n", getpid(), i);
-
-            }
-
             exit();
         }
     }
 
     struct timeStruct *tv = malloc(sizeof(struct timeStruct));
-    for(int f=0;f<10;f++){
-        // Set the ptv variables after one of the children's work is finished
-        ptv[f].pid = waitForChild(tv);
-        ptv[f].turnAroundTime = tv->terminationTime - tv->creationTime;
-        ptv[f].CBT = tv->runningTime;
-        ptv[f].waitingTime = tv->sleepingTime + tv->readyTime;
+    for (int f = 0; f < 10; f++) {
+        // Set the pts variables after one of the children's work is finished
+        pts[f].pid = waitForChild(tv);
+        pts[f].turnAroundTime = tv->terminationTime - tv->creationTime;
+        pts[f].CBT = tv->runningTime;
+        pts[f].waitingTime = tv->sleepingTime + tv->readyTime;
 
         // Update the atv variablles
-        atv.averageTurnAroundTime += ptv[f].turnAroundTime;
-        atv.averageCBT += ptv[f].CBT;
-        atv.averageWaitingTime += ptv[f].waitingTime;
+        ats.averageTurnAroundTime += pts[f].turnAroundTime;
+        ats.averageCBT += pts[f].CBT;
+        ats.averageWaitingTime += pts[f].waitingTime;
         /*printf(1, "pid %d create %d term %d ready %d sleep %d cbt %d \n"
         , ptv[f].pid, tv->creationTime, tv->terminationTime,
          tv->readyTime, tv->sleepingTime, tv->runningTime);*/
@@ -78,11 +75,13 @@ int main(void) {
     }
 
     // Print the required time variables of the children
-    for(int i=0; i<10;i++){
-        printf(1,"Pid %d Turnaround time %d, CBT %d, and Waiting time %d .\n",ptv[i].pid, ptv[i].turnAroundTime, ptv[i].CBT, ptv[i].waitingTime);
+    for (int i = 0; i < 10; i++) {
+        printf(1, "Pid %d Turnaround time %d, CBT %d, and Waiting time %d .\n", pts[i].pid, pts[i].turnAroundTime,
+               pts[i].CBT, pts[i].waitingTime);
     }
 
     // Print the average time variables of all of the children
-    printf(1, "Average Turnaround time %d, Average CBT %d, and Average Waiting time %d .\n", (atv.averageTurnAroundTime / 10), (atv.averageCBT / 10), (atv.averageWaitingTime / 10));
+    printf(1, "Average Turnaround time %d, Average CBT %d, and Average Waiting time %d .\n",
+           (ats.averageTurnAroundTime / 10), (ats.averageCBT / 10), (ats.averageWaitingTime / 10));
     exit();
 }
