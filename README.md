@@ -39,4 +39,7 @@ This project aims to provide hands-on experience with essential operating system
 This project was developed as part of the **Operating Systems course** at **Amirkabir University of Technology (AUT)**.
 
 ## License  
-This project is licensed under the AUT License. 
+
+This project is based on the XV6 operating system, which is licensed under the MIT License. The original authors are **Frans Kaashoek**, **Robert Morris**, and **Russ Cox** from the **Massachusetts Institute of Technology (MIT)**.  
+
+See the [LICENSE](LICENSE) file for full details.  
